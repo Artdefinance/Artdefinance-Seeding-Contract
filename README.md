@@ -6,7 +6,7 @@ ADF Seeding Contract is a protocol where users can stake tokens to support artis
 
 ## Whitepaper
 
-A more detailed description of ADF Seeding can be found in the draft of the [ADF Seeding Whitepaper](https://github.com/Artdefinance/artdefinance-seeding-contract/blob/main/docs/Seeding Whitepaper.pdf).
+A more detailed description of ADF Seeding can be found in the draft of the [ADF Seeding Whitepaper](https://github.com/Artdefinance/artdefinance-seeding-contract/blob/main/docs/Seeding%20Whitepaper.pdf).
 
 
 
