@@ -1302,8 +1302,6 @@ contract ADFSeed is Ownable , ReentrancyGuard{
 
     IERC20 public immutable token;
     address public immutable reserveAddress;
-    
-    uint256 private testclaimTime = 2 hours;
 
     uint256 private seederClaimTime = 12 weeks;
     uint256 private artistClaimTime = 26 weeks;
@@ -1421,6 +1419,15 @@ contract ADFSeed is Ownable , ReentrancyGuard{
     event seederRewardInfoEvent (address[] artists , uint256[] rewards , address seeder , uint256 round) ;
     event seederImClaimEvent (address seeder , uint256 amount , uint256 claimTime);
 
+    /**
+     *  Add Event
+     */
+    event pauseEvent ( address owner , bool enbled , uint256 setPauseTime );
+    event artistJailEvent ( address[] jailArtists , uint256 jailTime);
+    event artistUnJailEvent (address[] unJailArtists , uint256 unJailTime);
+
+    event setArtistEvent ( address[] artists , uint256[] commissions);
+    event updateArtistEvent (address[] artists , uint256[] commissions);
 
     constructor (IERC20 _token , address _reserve) {
         token = _token;
@@ -1435,10 +1442,12 @@ contract ADFSeed is Ownable , ReentrancyGuard{
     
     function setPause ( bool _enabled ) external onlyOwner {
         seedingPause = _enabled;
+
+        emit pauseEvent(msg.sender, _enabled, block.timestamp);
     }
     /// @notice setArtist is called once before the start of round one.
     /// @param _artistAddress artistlist.
-    /// @param _commissions Artist commissions ranging from 1% to 5 %.
+    /// @param _commissions Artist commissions ranging from 0% to 5 %.
     function setArtist ( address[] memory _artistAddress , uint256[] memory _commissions , uint256 _arrayCount ) public onlyOwner {
         
         require (_artistAddress.length == _arrayCount &&
@@ -1448,6 +1457,7 @@ contract ADFSeed is Ownable , ReentrancyGuard{
             
             if (artistList.length != 0) {
                 require (artistList[artistListIndex[_artistAddress[i]]]._artist != _artistAddress[i] , "aleady exist artist");
+                require (_commissions[i] <= 5 , "commission cannot exceed five percentage");
             }
 
             artistInfo memory artist_info = artistInfo ({
@@ -1459,7 +1469,9 @@ contract ADFSeed is Ownable , ReentrancyGuard{
 
             artistListIndex[_artistAddress[i]] = artistList.length;
             artistList.push(artist_info);    
-        } 
+        }
+
+        emit setArtistEvent(_artistAddress , _commissions); 
     }
     
     /// @notice update artist commissions.
@@ -1470,9 +1482,14 @@ contract ADFSeed is Ownable , ReentrancyGuard{
         
         for ( uint i = 0; i < _arrayCount ; i++) {
             
+            require (artistList[artistListIndex[_artistAddress[i]]]._artist == _artistAddress[i] , "non-exist artist");
+            require (_commissions[i] <= 5 , "commission cannot exceed five percentage");
+
             artistInfo storage aList = artistList[artistListIndex[_artistAddress[i]]];
             aList._commission = _commissions[i];
         }
+
+        emit updateArtistEvent(_artistAddress, _commissions);
     }
 
     /// @notice Jail the registered artist and retrieve their remaining rewards.
@@ -1482,6 +1499,8 @@ contract ADFSeed is Ownable , ReentrancyGuard{
             _getRemainingReward(_artistAddress[i]);
             artistList[artistListIndex[_artistAddress[i]]]._jailed = true;
         }
+
+        emit artistJailEvent( _artistAddress , block.timestamp );
     }
 
     function _getRemainingReward ( address _artist ) internal {
@@ -1505,6 +1524,8 @@ contract ADFSeed is Ownable , ReentrancyGuard{
 
             artistList[artistListIndex[_artistAddress[i]]]._jailed = false;
         }
+
+        emit artistUnJailEvent(_artistAddress , block.timestamp);
     }
     
     function getArtistCount () public view returns ( uint256 _count ) {
@@ -1576,6 +1597,7 @@ contract ADFSeed is Ownable , ReentrancyGuard{
     function endRound (uint256 _roundRewardAmount) public onlyOwner {
         
         require ( RoundInfo[currentRound]._roundStatus == true , "Unable to end round");
+        require ( RoundInfo[currentRound]._roundStartTime + 1 weeks <= block.timestamp , "endRound should be a week after the start");
 
         roundInfo storage round_info = RoundInfo[currentRound];
 
@@ -1593,6 +1615,8 @@ contract ADFSeed is Ownable , ReentrancyGuard{
         ( address[] memory _artists , uint256[] memory _rewards ) = _artistRewardDist( orderAddressByRound[currentRound] , orderAddressByRound[currentRound].length );
 
         round_info._roundEndTime = block.timestamp;
+
+        token.safeTransferFrom(msg.sender , address(this) , _roundRewardAmount);
 
         emit endRoundEvent( currentRound , round_info._roundEndTime , _artists , _rewards );
     }
@@ -1643,7 +1667,7 @@ contract ADFSeed is Ownable , ReentrancyGuard{
         
         artistRewardInfo memory artistReward_info = artistRewardInfo ({
             _rewardAmount : _amount,
-            _rewardTime : block.timestamp + testclaimTime,
+            _rewardTime : block.timestamp + artistClaimTime,
             _withdrawn : false
         });
         
@@ -1711,7 +1735,7 @@ contract ADFSeed is Ownable , ReentrancyGuard{
     
         isSeederReq[_round][msg.sender] = true;
 
-        seederReqTimes[_round][msg.sender] = block.timestamp + testclaimTime;
+        seederReqTimes[_round][msg.sender] = block.timestamp + seederClaimTime;
         
         emit seederRewardReqEvent( _round , msg.sender , block.timestamp , seederReqTimes[_round][msg.sender]);
 
@@ -2083,11 +2107,6 @@ contract ADFSeed is Ownable , ReentrancyGuard{
         return artistSeeder[_artist][artistSeederIndex[_artist][_seeder]];
     }
     
-    function getToken() external onlyOwner{
-        uint256 amount = token.balanceOf(address(this));
-        token.safeTransfer(msg.sender , amount);
-    }
-    
     function _sortArtist () internal view returns (artistInfo[] memory){
 
         artistInfo[] memory tmp = artistList;
@@ -2103,17 +2122,19 @@ contract ADFSeed is Ownable , ReentrancyGuard{
         uint256 totalTier = RoundInfo[currentRound]._tierCount;
         
         for (uint i = 1 ; i <= totalTier ; i++) {
-            uint256 temp = (_index*10) / 3 ** i;
 
-            if ( temp <= 10 ) {
-                tier = i;
-                if (tier == 1) {
-                    members = 3;
-                }else {
-                    members = 3**tier - 3**(tier-1);
+            if ( i == 1 && _index <= 3 ) {
+                members = 3;
+                tier = i; break;
+            }
+            else {
+                uint256 totalMembers = 3**i;
+                members = 3**i - 3**(i-1);
+                if (_index <= totalMembers) {
+                    tier = i; break;
                 }
-                break;
-            }        
+            }
+            
         }
     }
     
