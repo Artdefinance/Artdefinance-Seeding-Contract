@@ -1767,7 +1767,7 @@ contract ADFSeed is Ownable , ReentrancyGuard{
     ///@notice Calculate the reward for the requested seeder
     ///@param _artists All artists seeding by the seeder 
     ///@param _denominators Total value for all seeds that have been seeded to one artist
-    ///@param _weights Weight over seeding time
+    ///@param _weights Weight over seeding time 
     ///@param _seeder The seeder who called 'seederRewardReq' function
     ///@param _round The requestable round
     function setSeederRewardInfo ( 
@@ -1791,6 +1791,9 @@ contract ADFSeed is Ownable , ReentrancyGuard{
 
         for (uint256 i = 0 ; i < _arrayLength; i++) {
             
+            require (_weights[i] > 0 , "weight must be greater than zero");
+            require (_denominators[i] > 0 , "denominator must be greater than zero");
+
             uint256 reward = _seederReward (_round , _seeder , _artists[i] , _weights[i] , _denominators[i]);
 
             roundTotalReward = roundTotalReward.add(reward);
