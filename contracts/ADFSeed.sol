@@ -1408,7 +1408,7 @@ contract ADFSeed is Ownable , ReentrancyGuard{
     event seedingEvent (address artist, address seeder, uint256 amount , uint256 seedingTime );
     event unseedEvent (address artist , address seeder , uint256 amount , uint256 unseedTime);
 
-    event startRoundEvent (uint256 round , uint256 roundStartTime);
+    event startRoundEvent (uint256 round , uint256 roundStartTime , uint256 roundEndTime);
     event endRoundEvent (uint256 round , uint256 roundEndTime , address[] artistList , uint256[] artistReward);
 
     event artistRewardDistEvent ( address[] artist , uint256[] amount , uint256 round , uint256 disTime);
@@ -1554,6 +1554,7 @@ contract ADFSeed is Ownable , ReentrancyGuard{
         round_info._tierCount = _tierCnt;
         round_info._totalSeeding = RoundInfo[currentRound-1]._totalSeeding;
         round_info._roundStartTime = block.timestamp;
+        round_info._roundEndTime = block.timestamp + 1 weeks;
         round_info._roundStatus = true;
 
         uint256 reserveTransferAmount;
@@ -1567,7 +1568,7 @@ contract ADFSeed is Ownable , ReentrancyGuard{
             reserveAmount = 0;
         }
 
-        emit startRoundEvent(currentRound , round_info._roundStartTime);
+        emit startRoundEvent(currentRound , round_info._roundStartTime , round_info._roundEndTime);
 
     }
 
@@ -1597,7 +1598,7 @@ contract ADFSeed is Ownable , ReentrancyGuard{
     function endRound (uint256 _roundRewardAmount) public onlyOwner {
         
         require ( RoundInfo[currentRound]._roundStatus == true , "Unable to end round");
-        require ( RoundInfo[currentRound]._roundStartTime + 1 weeks <= block.timestamp , "endRound should be a week after the start");
+        require ( RoundInfo[currentRound]._roundEndTime <= block.timestamp , "endRound should be a week after the start");
 
         roundInfo storage round_info = RoundInfo[currentRound];
 
@@ -1614,7 +1615,6 @@ contract ADFSeed is Ownable , ReentrancyGuard{
         
         ( address[] memory _artists , uint256[] memory _rewards ) = _artistRewardDist( orderAddressByRound[currentRound] , orderAddressByRound[currentRound].length );
 
-        round_info._roundEndTime = block.timestamp;
 
         token.safeTransferFrom(msg.sender , address(this) , _roundRewardAmount);
 
