@@ -1571,7 +1571,7 @@ contract ADFSeed is Ownable , ReentrancyGuard{
         emit startRoundEvent(currentRound , round_info._roundStartTime , round_info._roundEndTime);
 
     }
-
+    /* Immediate claim confirmation */
     function getReserveAmount ( uint256 _round ) public view returns ( uint256 ) {
         
         uint256 roundReserveAmount = (reserveAmount.add(RoundInfo[_round]._roundReward)).sub(RoundInfo[_round]._claimReward);
